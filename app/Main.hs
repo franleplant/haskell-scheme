@@ -29,7 +29,22 @@ data LispVal = Atom String
              | Number Integer
              | String String
              | Bool Bool
-             deriving (Show)
+
+instance Show LispVal where show = showVal
+
+showVal :: LispVal -> String
+showVal (String str) = "\"" ++ str ++ "\""
+showVal (Atom name) = name
+showVal (Number num) = show num
+showVal (Float num) = show num
+showVal (Bool True) = "#t"
+showVal (Bool False) = "#f"
+showVal (List contents) = "(" ++ unwordsList contents ++ ")"
+showVal (DottedList head tail) = "(" ++ unwordsList head ++ " . " ++ showVal tail ++ ")"
+
+unwordsList :: [LispVal] -> String
+unwordsList = unwords . map showVal
+
 
 parseString :: Parser LispVal
 parseString = do
@@ -89,8 +104,7 @@ parseQuoted = do
 parseExpr :: Parser LispVal
 parseExpr = parseAtom
          <|> parseString
-         <|> parseFloat
-         <|> parseNumber
+         <|> try parseFloat <|> parseNumber
          <|> parseQuoted
          <|> do char '('
                 x <- try parseList <|> parseDottedList
