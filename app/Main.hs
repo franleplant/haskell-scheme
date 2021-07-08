@@ -25,6 +25,7 @@ spaces = skipMany1 space
 data LispVal = Atom String
              | List [LispVal]
              | DottedList [LispVal] LispVal
+             | Float Float
              | Number Integer
              | String String
              | Bool Bool
@@ -40,7 +41,11 @@ parseString = do
 escapedChars :: Parser Char
 escapedChars = do
   char '\\'
-  oneOf ['"', 'n', 't']
+  x <- oneOf ['"', 'n', 't']
+  return $ case x of
+             'n' -> '\n'
+             't' -> '\t'
+             _ -> x
 
 
 parseAtom :: Parser LispVal
@@ -56,12 +61,17 @@ parseAtom = do
 
 parseNumber :: Parser LispVal
 parseNumber = Number . read <$> many1 digit
---parseNumber = do
-  --pnum <- many1 digit
-  --return $ (Number . read) pnum
+
+parseFloat :: Parser LispVal
+parseFloat = do
+  int <- many1 digit
+  char '.'
+  dec <- many1 digit
+  return $ (Float . read) (int ++ "." ++ dec)
 
 
 parseExpr :: Parser LispVal
 parseExpr = parseAtom
          <|> parseString
+         <|> parseFloat
          <|> parseNumber
