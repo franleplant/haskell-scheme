@@ -5,19 +5,8 @@ import Data.List
 import Text.ParserCombinators.Parsec hiding (spaces)
 import Control.Monad
 
-main :: IO ()
-main = do
-  (expr:_) <- getArgs
-  putStrLn $ "parsing " ++ expr
-  putStrLn $ readExpr expr
-
 symbol :: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
-
-readExpr :: String -> String
-readExpr input = case parse parseExpr "lisp" input of
-  Left err -> "No match: " ++ show err
-  Right val -> "Found value: " ++ show val
 
 spaces :: Parser ()
 spaces = skipMany1 space
@@ -114,4 +103,59 @@ parseExpr = parseAtom
 
 
 
+eval :: LispVal -> LispVal
+eval val@(String _) = val
+eval val@(Number _) = val
+eval val@(Bool _) = val
+eval (List [Atom "quote", val]) = val
+eval (List (Atom func : args)) = apply func $ map eval args
+
+
+apply :: String -> [LispVal] -> LispVal
+apply func args = maybe (Bool False) ($ args) $ lookup func primitives
+
+primitives :: [(String, [LispVal] -> LispVal)]
+primitives = [
+  ("+", numericBinop (+)),
+  ("-", numericBinop (-)),
+  ("*", numericBinop (*)),
+  ("/", numericBinop div),
+  ("mod", numericBinop mod),
+  ("quotient", numericBinop quot),
+  ("remainder", numericBinop rem),
+  ("symbol?", isType isSymbol),
+  ("number?", isType isNumber)
+  ]
+
+numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> LispVal
+numericBinop op params = Number $ foldl1 op $ map unpackNum params
+
+unpackNum :: LispVal -> Integer
+unpackNum (Number n) = n
+unpackNum _ = 0
+
+
+isType :: (LispVal -> Bool) -> [LispVal] -> LispVal
+isType predicate xs = Bool $ all predicate xs
+
+-- TODO how to make it generic?
+-- TODO this is not working
+isSymbol :: LispVal -> Bool
+isSymbol (List [Atom "quote", _]) = True
+isSymbol _ = False
+
+isNumber :: LispVal -> Bool
+isNumber (Number _) = True
+isNumber (Float _) = True
+isNumber _ = False
+
+
+main :: IO ()
+main = getArgs >>= print . eval . readExpr . head
+
+
+readExpr :: String -> LispVal
+readExpr input = case parse parseExpr "lisp" input of
+  Left err -> String $ "No match: " ++ show err
+  Right val -> val
 
